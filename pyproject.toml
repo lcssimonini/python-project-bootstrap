@@ -1,0 +1,17 @@
+[project]
+name = "python-project-bootstrap"
+version = "0.1.0"
+description = "Bootstrap tool that generates modern Python project scaffolding"
+license = "MIT"
+requires-python = ">=3.12"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "hypothesis",
+    "ruff",
+    "mypy",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

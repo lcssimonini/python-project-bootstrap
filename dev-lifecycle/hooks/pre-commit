@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pre-commit hook: runs secret detection and linting on staged files.
+# Installed via: bash dev-lifecycle/hooks/install-hooks.sh
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+echo "==> Scanning for secrets (gitleaks)..."
+if ! bash "$REPO_ROOT/dev-lifecycle/secrets/detect-secrets.sh"; then
+  echo "Commit blocked: secrets detected. Remove them and try again."
+  exit 1
+fi
+
+echo "==> Running ruff lint..."
+if ! uv run ruff check . 2>/dev/null; then
+  echo "Commit blocked: lint errors found. Run 'uv run ruff check --fix .' to auto-fix."
+  exit 1
+fi
+
+echo "==> Running ruff format check..."
+if ! uv run ruff format --check . 2>/dev/null; then
+  echo "Commit blocked: formatting issues. Run 'uv run ruff format .' to fix."
+  exit 1
+fi
+
+echo "All pre-commit checks passed."

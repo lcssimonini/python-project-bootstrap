@@ -1,0 +1,37 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.swp
+
+# Python build artifacts
+__pycache__/
+*.pyc
+dist/
+build/
+*.egg-info/
+
+# PyInstaller artifacts
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment files
+.env
+
+# Testing artifacts
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Earthly
+.earthly/
+
+.kiro/
