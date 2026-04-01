@@ -16,18 +16,39 @@ BLUE="\033[0;34m"
 NC="\033[0m"
 
 DRY_RUN=false
+VERBOSE=false
+QUIET=false
+UPDATE_CONFIG=false
 SUCCESS_FLAG=false
 PROJECT_DIR=""
+
+# Template context defaults
+PYTHON_VERSION="3.12"
+INCLUDE_DOCKER=true
+INCLUDE_API=true
+INCLUDE_CLI=true
+LICENSE_TYPE="MIT"
+INTERACTIVE=false
+
+# Resolve the directory where this script lives (for locating render_templates.py)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # -----------------------------
 # Logging
 # -----------------------------
 
 log() {
+  [[ "$QUIET" == true ]] && return
   echo -e "${BLUE}[INFO]${NC} $1"
 }
 
+verbose_log() {
+  [[ "$VERBOSE" != true ]] && return
+  echo -e "${BLUE}[VERBOSE]${NC} $1"
+}
+
 success() {
+  [[ "$QUIET" == true ]] && return
   echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
@@ -38,6 +59,31 @@ warn() {
 error() {
   echo -e "${RED}[ERROR]${NC} $1" >&2
   exit 1
+}
+
+# -----------------------------
+# Version
+# -----------------------------
+
+get_version() {
+  grep '^version' "$SCRIPT_DIR/pyproject.toml" | head -1 | sed 's/.*"\(.*\)".*/\1/'
+}
+
+# -----------------------------
+# Validation
+# -----------------------------
+
+validate_python_version() {
+  if [[ ! "$1" =~ ^3\.[0-9]+$ ]]; then
+    error "Invalid Python version '$1'. Must match pattern '3.NN' (e.g., 3.12, 3.13)."
+  fi
+}
+
+validate_license() {
+  case "$1" in
+    MIT|Apache-2.0|GPL-3.0-only|BSD-2-Clause|BSD-3-Clause) ;;
+    *) error "Unsupported license '$1'. Supported: MIT, Apache-2.0, GPL-3.0-only, BSD-2-Clause, BSD-3-Clause" ;;
+  esac
 }
 
 # -----------------------------
@@ -56,7 +102,7 @@ run_cmd() {
   if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}[DRY-RUN]${NC} $*"
   else
-    echo -e "${BLUE}[RUN]${NC} $*"
+    verbose_log "Executing: $*"
     "$@"
   fi
 }
@@ -72,6 +118,26 @@ write_file() {
   else
     cat > "$filepath"
   fi
+}
+
+# -----------------------------
+# Template context builder
+# -----------------------------
+
+build_context_json() {
+  cat <<EOF
+{
+  "project_name": "$PROJECT_NAME",
+  "package_name": "$PACKAGE_NAME",
+  "python_version": "$PYTHON_VERSION",
+  "include_docker": $INCLUDE_DOCKER,
+  "include_api": $INCLUDE_API,
+  "include_cli": $INCLUDE_CLI,
+  "license_type": "$LICENSE_TYPE",
+  "ruff_version": "$RUFF_VERSION",
+  "mypy_version": "$MYPY_VERSION"
+}
+EOF
 }
 
 # -----------------------------
@@ -92,8 +158,20 @@ Bootstrap a modern Python project using:
   - Docker + Docker Compose
 
 OPTIONS:
-  -h, --help        Show this help message
-  -d, --dry-run     Print actions without executing
+  -h, --help                Show this help message
+  -d, --dry-run             Print actions without executing
+  -v, --version             Print version and exit
+  --no-docker               Skip Docker file generation
+  --no-api                  Skip FastAPI scaffolding
+  --no-cli                  Skip Typer CLI scaffolding
+  --license <SPDX>          License type (default: MIT)
+                            Supported: MIT, Apache-2.0, GPL-3.0-only,
+                            BSD-2-Clause, BSD-3-Clause
+  -i, --interactive         Prompt for each component before generating
+  --python-version <ver>    Python version for generated project (default: 3.12)
+  --verbose                 Show detailed logging output
+  -q, --quiet               Suppress informational output (errors only)
+  --update-config <dir>     Regenerate tooling files in an existing project
 
 ARGUMENTS:
   project-name      Name of the project directory and package
@@ -101,6 +179,9 @@ ARGUMENTS:
 EXAMPLES:
   $cmd my_project
   $cmd my_project --dry-run
+  $cmd my_project --no-docker --no-api
+  $cmd my_project --license Apache-2.0 --python-version 3.13
+  $cmd --update-config ./my_project
 
 WHAT WILL BE CREATED:
   - src/ layout (best practice)
@@ -132,8 +213,50 @@ while [[ $# -gt 0 ]]; do
       show_help
       exit 0
       ;;
+    -v|--version)
+      echo "$(get_version)"
+      exit 0
+      ;;
     -d|--dry-run)
       DRY_RUN=true
+      shift
+      ;;
+    --no-docker)
+      INCLUDE_DOCKER=false
+      shift
+      ;;
+    --no-api)
+      INCLUDE_API=false
+      shift
+      ;;
+    --no-cli)
+      INCLUDE_CLI=false
+      shift
+      ;;
+    --license)
+      LICENSE_TYPE="$2"
+      validate_license "$LICENSE_TYPE"
+      shift 2
+      ;;
+    -i|--interactive)
+      INTERACTIVE=true
+      shift
+      ;;
+    --python-version)
+      PYTHON_VERSION="$2"
+      validate_python_version "$PYTHON_VERSION"
+      shift 2
+      ;;
+    --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -q|--quiet)
+      QUIET=true
+      shift
+      ;;
+    --update-config)
+      UPDATE_CONFIG=true
       shift
       ;;
     *)
@@ -144,6 +267,79 @@ while [[ $# -gt 0 ]]; do
 done
 
 set -- "${POSITIONAL[@]+"${POSITIONAL[@]}"}"
+
+if [[ "$VERBOSE" == true && "$QUIET" == true ]]; then
+  error "Cannot use --verbose and --quiet together"
+fi
+
+# -----------------------------
+# --update-config mode: regenerate tooling files in an existing project
+# -----------------------------
+
+if [[ "$UPDATE_CONFIG" == true ]]; then
+  if [ "$#" -ne 1 ]; then
+    error "--update-config requires a project directory path"
+  fi
+
+  UPDATE_DIR="$1"
+
+  if [[ ! -d "$UPDATE_DIR" ]]; then
+    error "Directory '$UPDATE_DIR' does not exist"
+  fi
+
+  if [[ ! -f "$UPDATE_DIR/pyproject.toml" ]]; then
+    error "Not a valid project directory (missing pyproject.toml): $UPDATE_DIR"
+  fi
+
+  # Extract project info from existing pyproject.toml
+  PROJECT_NAME=$(grep '^name' "$UPDATE_DIR/pyproject.toml" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+  PACKAGE_NAME="${PROJECT_NAME//-/_}"
+
+  # Fetch pre-commit hook versions (fall back to known defaults)
+  RUFF_VERSION="v0.8.6"
+  MYPY_VERSION="v1.14.1"
+
+  if command -v git >/dev/null 2>&1; then
+    _ruff_latest=$(git ls-remote --tags --sort=-v:refname https://github.com/astral-sh/ruff-pre-commit.git 'refs/tags/v*' 2>/dev/null | head -n1 | sed 's|.*refs/tags/||') || true
+    [[ -n "${_ruff_latest:-}" ]] && RUFF_VERSION="$_ruff_latest"
+    _mypy_latest=$(git ls-remote --tags --sort=-v:refname https://github.com/pre-commit/mirrors-mypy.git 'refs/tags/v*' 2>/dev/null | head -n1 | sed 's|.*refs/tags/||') || true
+    [[ -n "${_mypy_latest:-}" ]] && MYPY_VERSION="$_mypy_latest"
+  fi
+
+  log "Updating tooling configuration in $UPDATE_DIR..."
+
+  # Only render tooling files
+  TOOLING_FILES=("Makefile" ".pre-commit-config.yaml" ".gitignore")
+  if [[ "$INCLUDE_DOCKER" == true ]]; then
+    TOOLING_FILES+=("Dockerfile" "docker-compose.yml" ".dockerignore")
+  fi
+
+  # Determine the Python command that has jinja2 available
+  PYTHON_CMD="python3"
+  if ! python3 -c "import jinja2" 2>/dev/null; then
+    if command -v uv >/dev/null 2>&1; then
+      PYTHON_CMD="uv run --directory $SCRIPT_DIR python3"
+    else
+      error "jinja2 is not installed. Install it with: pip install jinja2"
+    fi
+  fi
+
+  # Render all templates to a temp dir, then copy only tooling files
+  TEMP_DIR=$(mktemp -d)
+  build_context_json | $PYTHON_CMD "$SCRIPT_DIR/render_templates.py" "$TEMP_DIR"
+
+  for f in "${TOOLING_FILES[@]}"; do
+    if [[ -f "$TEMP_DIR/$f" ]]; then
+      cp "$TEMP_DIR/$f" "$UPDATE_DIR/$f"
+      verbose_log "Updated: $f"
+    fi
+  done
+
+  rm -rf "$TEMP_DIR"
+
+  success "Tooling configuration updated in $UPDATE_DIR"
+  exit 0
+fi
 
 if [ "$#" -ne 1 ]; then
   show_help
@@ -160,8 +356,10 @@ check_prerequisites() {
   local missing=()
 
   command -v git >/dev/null 2>&1 || missing+=("  - git: install from https://git-scm.com/")
-  command -v docker >/dev/null 2>&1 || missing+=("  - docker: install from https://docs.docker.com/get-docker/")
-  docker compose version >/dev/null 2>&1 || missing+=("  - docker compose: install from https://docs.docker.com/compose/install/")
+  if [[ "$INCLUDE_DOCKER" == true ]]; then
+    command -v docker >/dev/null 2>&1 || missing+=("  - docker: install from https://docs.docker.com/get-docker/")
+    docker compose version >/dev/null 2>&1 || missing+=("  - docker compose: install from https://docs.docker.com/compose/install/")
+  fi
   command -v uv >/dev/null 2>&1 || missing+=("  - uv: install from https://github.com/astral-sh/uv")
 
   if [[ ${#missing[@]} -gt 0 ]]; then
@@ -196,6 +394,32 @@ PACKAGE_NAME="${PROJECT_NAME//-/_}"
 trap cleanup EXIT INT TERM
 
 # -----------------------------
+# Interactive prompts
+# -----------------------------
+
+if [[ "$INTERACTIVE" == true ]]; then
+  read -rp "Include Docker support? [Y/n] " ans
+  [[ "$ans" =~ ^[Nn] ]] && INCLUDE_DOCKER=false
+  read -rp "Include FastAPI? [Y/n] " ans
+  [[ "$ans" =~ ^[Nn] ]] && INCLUDE_API=false
+  read -rp "Include Typer CLI? [Y/n] " ans
+  [[ "$ans" =~ ^[Nn] ]] && INCLUDE_CLI=false
+  read -rp "License type [MIT]: " ans
+  if [[ -n "$ans" ]]; then
+    LICENSE_TYPE="$ans"
+    validate_license "$LICENSE_TYPE"
+  fi
+  read -rp "Python version [3.12]: " ans
+  if [[ -n "$ans" ]]; then
+    PYTHON_VERSION="$ans"
+    validate_python_version "$PYTHON_VERSION"
+  fi
+fi
+
+# Validate python version (covers default and flag-provided values)
+validate_python_version "$PYTHON_VERSION"
+
+# -----------------------------
 # Create structure
 # -----------------------------
 
@@ -210,273 +434,10 @@ if [ "$DRY_RUN" = false ]; then
   rm -f "$PROJECT_DIR/main.py" "$PROJECT_DIR/README.md"
 fi
 
-run_cmd mkdir -p "$PROJECT_DIR/src/$PACKAGE_NAME/api"
-run_cmd mkdir -p "$PROJECT_DIR/src/$PACKAGE_NAME/core"
-run_cmd mkdir -p "$PROJECT_DIR/tests/unit"
-run_cmd mkdir -p "$PROJECT_DIR/tests/integration"
-
-run_cmd touch "$PROJECT_DIR/src/$PACKAGE_NAME/__init__.py"
-run_cmd touch "$PROJECT_DIR/src/$PACKAGE_NAME/py.typed"
-run_cmd touch "$PROJECT_DIR/src/$PACKAGE_NAME/api/__init__.py"
-run_cmd touch "$PROJECT_DIR/src/$PACKAGE_NAME/core/__init__.py"
-run_cmd touch "$PROJECT_DIR/tests/__init__.py"
-run_cmd touch "$PROJECT_DIR/tests/unit/__init__.py"
-run_cmd touch "$PROJECT_DIR/tests/integration/__init__.py"
-
-write_file "$PROJECT_DIR/tests/conftest.py" <<'EOF'
-import pytest
-
-@pytest.fixture
-def sample_fixture():
-    """Placeholder shared fixture."""
-    return {}
-EOF
-
-write_file "$PROJECT_DIR/tests/unit/test_cli.py" <<EOF
-from $PACKAGE_NAME.cli import app
-from typer.testing import CliRunner
-
-runner = CliRunner()
-
-
-def test_hello_default():
-    result = runner.invoke(app)
-    assert result.exit_code == 0
-    assert "Hello, world!" in result.output
-
-
-def test_hello_with_name():
-    result = runner.invoke(app, ["--name", "Alice"])
-    assert result.exit_code == 0
-    assert "Hello, Alice!" in result.output
-EOF
-
-write_file "$PROJECT_DIR/tests/unit/test_api.py" <<EOF
-from fastapi.testclient import TestClient
-from $PACKAGE_NAME.api.main import app
-
-client = TestClient(app)
-
-
-def test_root():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert "message" in response.json()
-EOF
-
-write_file "$PROJECT_DIR/.env.example" <<'EOF'
-# Environment variables for the project
-# Copy this file to .env and fill in the values
-# APP_ENV=development
-# DATABASE_URL=sqlite:///db.sqlite3
-# SECRET_KEY=change-me
-EOF
-
 # -----------------------------
-# Minimal entrypoints
+# Fetch pre-commit hook versions (fall back to known defaults)
 # -----------------------------
 
-log "Creating minimal entrypoints..."
-
-write_file "$PROJECT_DIR/src/$PACKAGE_NAME/api/main.py" <<EOF
-from fastapi import FastAPI
-
-app = FastAPI()
-
-
-@app.get("/")
-def root():
-    return {"message": "Hello from $PROJECT_NAME"}
-EOF
-
-write_file "$PROJECT_DIR/src/$PACKAGE_NAME/cli.py" <<EOF
-import typer
-
-app = typer.Typer()
-
-
-@app.command()
-def hello(name: str = "world"):
-    """Say hello."""
-    typer.echo(f"Hello, {name}!")
-
-
-if __name__ == "__main__":
-    app()
-EOF
-
-# -----------------------------
-# pyproject
-# -----------------------------
-
-log "Generating pyproject.toml..."
-
-write_file "$PROJECT_DIR/pyproject.toml" <<EOF
-[project]
-name = "$PROJECT_NAME"
-version = "0.1.0"
-description = ""
-requires-python = ">=3.12"
-dependencies = [
-    "fastapi",
-    "uvicorn[standard]",
-    "typer",
-    "pydantic",
-]
-
-[project.scripts]
-"$PROJECT_NAME" = "$PACKAGE_NAME.cli:app"
-"$PROJECT_NAME-api" = "$PACKAGE_NAME.api.main:app"
-
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.uv]
-package = true
-
-[dependency-groups]
-dev = [
-    "pytest",
-    "httpx",
-    "ruff",
-    "mypy",
-    "pre-commit",
-    "pyinstaller",
-]
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
-
-[tool.mypy]
-strict = true
-plugins = ["pydantic.mypy"]
-EOF
-
-# -----------------------------
-# Makefile
-# -----------------------------
-
-log "Creating Makefile..."
-
-write_file "$PROJECT_DIR/Makefile" <<EOF
-.DEFAULT_GOAL := help
-
-.PHONY: help install dev run-api run-cli test lint format type-check docker-build docker-up docker-down pre-commit-install clean build-exe
-
-help: ## Show available targets
-	@grep -E '^[a-zA-Z_-]+:.*##' \$(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*##"}; {printf "  %-20s %s\n", \$\$1, \$\$2}'
-
-install: ## Install dependencies
-	uv sync
-
-dev: ## Install dev dependencies and pre-commit hooks
-	uv sync --dev
-	uv run pre-commit install
-
-run-api: ## Run FastAPI app
-	uv run uvicorn $PACKAGE_NAME.api.main:app --reload --host 0.0.0.0 --port 8000
-
-run-cli: ## Run CLI tool
-	uv run $PROJECT_NAME
-
-test: ## Run tests
-	uv run pytest
-
-lint: ## Run linter
-	uv run ruff check .
-
-format: ## Format code
-	uv run ruff format .
-
-type-check: ## Run type checker
-	uv run mypy src/
-
-docker-build: ## Build Docker image
-	docker compose build
-
-docker-up: ## Start containers
-	docker compose up
-
-docker-down: ## Stop containers
-	docker compose down
-
-pre-commit-install: ## Install pre-commit hooks
-	uv run pre-commit install
-
-clean: ## Remove build artifacts and caches
-	rm -rf dist/ build/
-	rm -f *.spec
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	rm -rf .pytest_cache/ .mypy_cache/
-
-build-exe: ## Build standalone executable via PyInstaller
-	uv run pyinstaller --onefile src/$PACKAGE_NAME/cli.py --name $PROJECT_NAME
-EOF
-
-
-# -----------------------------
-# Docker
-# -----------------------------
-
-log "Creating Docker setup..."
-
-write_file "$PROJECT_DIR/Dockerfile" <<EOF
-# Stage 1: Builder
-FROM python:3.12-slim AS builder
-
-WORKDIR /app
-
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
-
-COPY . .
-RUN uv sync --frozen --no-dev
-
-# Stage 2: Runtime
-FROM python:3.12-slim
-
-WORKDIR /app
-
-RUN useradd --create-home appuser
-
-COPY --from=builder /app /app
-
-USER appuser
-
-CMD ["uv", "run", "uvicorn", "$PACKAGE_NAME.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
-EOF
-
-write_file "$PROJECT_DIR/docker-compose.yml" <<EOF
-services:
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
-    command: uv run uvicorn $PACKAGE_NAME.api.main:app --reload --host 0.0.0.0 --port 8000
-EOF
-
-# -----------------------------
-# Pre-commit config
-# -----------------------------
-
-log "Creating pre-commit configuration..."
-
-# Fetch latest release tags for ruff and mypy (fall back to known versions)
 RUFF_VERSION="v0.8.6"
 MYPY_VERSION="v1.14.1"
 
@@ -491,23 +452,27 @@ if command -v git >/dev/null 2>&1 && [ "$DRY_RUN" = false ]; then
   fi
 fi
 
-log "Using ruff pre-commit rev: $RUFF_VERSION, mypy rev: $MYPY_VERSION"
+# -----------------------------
+# Render templates
+# -----------------------------
 
-write_file "$PROJECT_DIR/.pre-commit-config.yaml" <<EOF
-repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: $RUFF_VERSION
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
+log "Rendering project files from templates..."
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: $MYPY_VERSION
-    hooks:
-      - id: mypy
-        additional_dependencies: [pydantic]
-EOF
+if [ "$DRY_RUN" = true ]; then
+  echo -e "${YELLOW}[DRY-RUN]${NC} Would render templates to $PROJECT_DIR"
+else
+  verbose_log "Template context: $(build_context_json)"
+  # Determine the Python command that has jinja2 available
+  PYTHON_CMD="python3"
+  if ! python3 -c "import jinja2" 2>/dev/null; then
+    if command -v uv >/dev/null 2>&1; then
+      PYTHON_CMD="uv run --directory $SCRIPT_DIR python3"
+    else
+      error "jinja2 is not installed. Install it with: pip install jinja2"
+    fi
+  fi
+  build_context_json | $PYTHON_CMD "$SCRIPT_DIR/render_templates.py" "$PROJECT_DIR"
+fi
 
 # -----------------------------
 # Dependencies
@@ -515,7 +480,13 @@ EOF
 
 log "Installing dependencies via uv..."
 
-run_cmd uv add --directory "$PROJECT_DIR" fastapi uvicorn typer pydantic
+run_cmd uv add --directory "$PROJECT_DIR" pydantic
+if [[ "$INCLUDE_API" == true ]]; then
+  run_cmd uv add --directory "$PROJECT_DIR" fastapi "uvicorn[standard]"
+fi
+if [[ "$INCLUDE_CLI" == true ]]; then
+  run_cmd uv add --directory "$PROJECT_DIR" typer
+fi
 run_cmd uv add --directory "$PROJECT_DIR" --dev pytest ruff mypy
 
 # -----------------------------
@@ -525,42 +496,6 @@ run_cmd uv add --directory "$PROJECT_DIR" --dev pytest ruff mypy
 log "Initializing git repository..."
 
 run_cmd git init "$PROJECT_DIR"
-
-write_file "$PROJECT_DIR/.gitignore" <<'GITIGNORE_EOF'
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
-dist/
-build/
-
-# Virtual environments
-.venv/
-venv/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Environment
-.env
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-.coverage
-htmlcov/
-
-# PyInstaller
-*.spec
-GITIGNORE_EOF
 
 if [ "$DRY_RUN" = false ]; then
   git -C "$PROJECT_DIR" add .
@@ -582,12 +517,14 @@ SUCCESS_FLAG=true
 
 success "Project '$PROJECT_NAME' created successfully!"
 
-echo
-echo "Next steps:"
-echo "  cd $PROJECT_NAME"
-echo "  make install"
-echo "  make run-api"
-echo "  make test"
+if [[ "$QUIET" != true ]]; then
+  echo
+  echo "Next steps:"
+  echo "  cd $PROJECT_NAME"
+  echo "  make install"
+  echo "  make run-api"
+  echo "  make test"
+fi
 
 if [ "$DRY_RUN" = true ]; then
   warn "Dry-run mode enabled: no files were actually created"

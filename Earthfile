@@ -5,9 +5,9 @@ deps:
     FROM python:3.12-slim
     WORKDIR /workspace
 
-    # System deps needed by tests (git, docker CLI)
+    # System deps needed by tests (git, docker CLI, shellcheck)
     RUN apt-get update && \
-        apt-get install -y --no-install-recommends git docker.io curl && \
+        apt-get install -y --no-install-recommends git docker.io curl shellcheck && \
         rm -rf /var/lib/apt/lists/*
 
     # Install gitleaks
@@ -32,6 +32,7 @@ lint:
     FROM +deps
     RUN uv run ruff check .
     RUN uv run ruff format --check .
+    RUN shellcheck python-project-bootstrap.sh dev-lifecycle/ci/run-tests.sh dev-lifecycle/hooks/install-hooks.sh dev-lifecycle/hooks/pre-commit dev-lifecycle/secrets/detect-secrets.sh
 
 # ---------- secret scan ----------
 secrets:

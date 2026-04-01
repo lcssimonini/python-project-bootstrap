@@ -10,4 +10,4 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "==> Running tests"
-uv run pytest tests/ -v "$@"
+uv run pytest tests/ -v --cov --cov-report=term-missing "$@"

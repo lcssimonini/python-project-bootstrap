@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Build executable
+        run: uv run pyinstaller --onefile --add-data "python-project-bootstrap.sh:." --name python-project-bootstrap bootstrap_wrapper.py
+
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          SECTION=$(awk "/^## \[${TAG}\]/{found=1;next} /^## \[/{if(found)exit} found{print}" CHANGELOG.md)
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$SECTION" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.changelog.outputs.body }}
+          files: dist/python-project-bootstrap

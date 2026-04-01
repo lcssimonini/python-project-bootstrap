@@ -1,0 +1,60 @@
+.DEFAULT_GOAL := help
+
+.PHONY: help install dev{% if include_api %} run-api{% endif %}{% if include_cli %} run-cli{% endif %} test lint format type-check{% if include_docker %} docker-build docker-up docker-down{% endif %} pre-commit-install clean{% if include_cli %} build-exe{% endif %}
+
+help: ## Show available targets
+	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*##"}; {printf "  %-20s %s\n", $$1, $$2}'
+
+install: ## Install dependencies
+	uv sync
+
+dev: ## Install dev dependencies and pre-commit hooks
+	uv sync --dev
+	uv run pre-commit install
+{%- if include_api %}
+
+run-api: ## Run FastAPI app
+	uv run uvicorn {{ package_name }}.api.main:app --reload --host 0.0.0.0 --port 8000
+{%- endif %}
+{%- if include_cli %}
+
+run-cli: ## Run CLI tool
+	uv run {{ project_name }}
+{%- endif %}
+
+test: ## Run tests
+	uv run pytest
+
+lint: ## Run linter
+	uv run ruff check .
+
+format: ## Format code
+	uv run ruff format .
+
+type-check: ## Run type checker
+	uv run mypy src/
+{%- if include_docker %}
+
+docker-build: ## Build Docker image
+	docker compose build
+
+docker-up: ## Start containers
+	docker compose up
+
+docker-down: ## Stop containers
+	docker compose down
+{%- endif %}
+
+pre-commit-install: ## Install pre-commit hooks
+	uv run pre-commit install
+
+clean: ## Remove build artifacts and caches
+	rm -rf dist/ build/
+	rm -f *.spec
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	rm -rf .pytest_cache/ .mypy_cache/
+{%- if include_cli %}
+
+build-exe: ## Build standalone executable via PyInstaller
+	uv run pyinstaller --onefile src/{{ package_name }}/cli.py --name {{ project_name }}
+{%- endif %}

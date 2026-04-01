@@ -150,7 +150,7 @@ def test_existing_directory_prevents_execution(name, run_bootstrap, tmp_workdir)
 # Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 9.1
 
 
-@given(name=valid_project_names)
+@given(name=uv_safe_project_names)
 @settings(
     max_examples=5,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
@@ -432,7 +432,7 @@ def test_cleanup_removes_directory_on_failure(name, tmp_workdir):
     )
 
 
-# --- Property 13: Repository .gitignore contains all required patterns ---
+# --- Property 12: Repository .gitignore contains all required patterns ---
 # Validates: Requirements 12.1, 12.2, 12.3, 12.4, 12.5, 12.6
 
 
@@ -458,7 +458,7 @@ def test_repository_gitignore_contains_all_required_patterns():
     assert ".env" in content
 
 
-# --- Property 14: Prerequisite checker reports all missing tools ---
+# --- Property 13: Prerequisite checker reports all missing tools ---
 # Validates: Requirements 15.1, 15.2, 15.3, 15.4, 15.5, 15.8
 
 

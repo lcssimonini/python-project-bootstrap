@@ -4,7 +4,7 @@ EXE_NAME := python-project-bootstrap
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install uninstall build-exe install-exe clean ci lint test typecheck secrets setup-hooks
+.PHONY: help install uninstall build-exe install-exe clean ci lint shellcheck test typecheck secrets setup-hooks docs-serve docs-build
 
 help: ## Show available targets
 	@echo "Usage: make <target>"
@@ -47,6 +47,9 @@ lint: ## Run ruff lint + format check
 	uv run ruff check .
 	uv run ruff format --check .
 
+shellcheck: ## Run ShellCheck on shell scripts
+	shellcheck python-project-bootstrap.sh dev-lifecycle/**/*.sh
+
 typecheck: ## Run mypy type checker
 	uv run mypy .
 
@@ -58,3 +61,11 @@ test: ## Run test suite
 
 ci: ## Run full CI pipeline via Earthly (same as GitHub Actions)
 	earthly +ci
+
+# ---------- Documentation ----------
+
+docs-serve: ## Serve documentation locally
+	uv run mkdocs serve
+
+docs-build: ## Build documentation site
+	uv run mkdocs build

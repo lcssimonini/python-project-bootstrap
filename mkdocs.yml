@@ -1,0 +1,9 @@
+site_name: Python Project Bootstrap
+repo_url: https://github.com/lcssimonini/python-project-bootstrap
+repo_name: lcssimonini/python-project-bootstrap
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md

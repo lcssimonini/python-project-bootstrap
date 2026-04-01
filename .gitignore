@@ -31,7 +31,13 @@ venv/
 .coverage
 htmlcov/
 
+# Linter cache
+.ruff_cache/
+
 # Earthly
 .earthly/
+
+# MkDocs build output
+site/
 
 .kiro/

@@ -1,5 +1,10 @@
 # Python Project Bootstrap
 
+[![CI](https://github.com/lcssimonini/python-project-bootstrap/actions/workflows/ci.yml/badge.svg)](https://github.com/lcssimonini/python-project-bootstrap/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Coverage](https://img.shields.io/badge/coverage-check%20CI-brightgreen.svg)]()
+
 A production-ready bootstrap tool that generates modern Python project scaffolding using:
 
 * **uv** for dependency management
@@ -26,6 +31,7 @@ A production-ready bootstrap tool that generates modern Python project scaffoldi
 * Trap-based cleanup on failure or interruption
 * Collect-all prerequisite checker with install hints
 * PyInstaller support for standalone executables (both this tool and generated projects)
+* Jinja2 template system for maintainable file generation
 
 ---
 
@@ -106,6 +112,46 @@ python-project-bootstrap my_project --dry-run
 * No `uv`, `git`, or `docker` commands are executed
 * Prerequisite checks are skipped
 * Every action line is prefixed with `[DRY-RUN]`
+
+### Customization Flags
+
+Skip components you don't need:
+
+```bash
+python-project-bootstrap my_project --no-docker --no-api
+python-project-bootstrap my_project --no-cli
+python-project-bootstrap my_project --license Apache-2.0
+python-project-bootstrap my_project --python-version 3.13
+```
+
+### Interactive Mode
+
+Prompt for each component:
+
+```bash
+python-project-bootstrap my_project --interactive
+```
+
+### Update Existing Project
+
+Regenerate tooling files without touching source code:
+
+```bash
+python-project-bootstrap --update-config ./my_project
+```
+
+### Verbosity Control
+
+```bash
+python-project-bootstrap my_project --verbose   # Detailed logging
+python-project-bootstrap my_project --quiet     # Errors only
+```
+
+### Version
+
+```bash
+python-project-bootstrap --version
+```
 
 ---
 

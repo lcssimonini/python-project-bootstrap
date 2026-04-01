@@ -4,14 +4,41 @@ version = "0.1.0"
 description = "Bootstrap tool that generates modern Python project scaffolding"
 license = "MIT"
 requires-python = ">=3.12"
+authors = [{name = "Lucas Simonini", email = "contact@simonini.tech"}]
+readme = "README.md"
+keywords = ["python", "bootstrap", "scaffolding", "project-generator"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+]
+dependencies = [
+    "jinja2",
+]
+
+[project.urls]
+Homepage = "https://github.com/lcssimonini/python-project-bootstrap"
+Repository = "https://github.com/lcssimonini/python-project-bootstrap"
+Issues = "https://github.com/lcssimonini/python-project-bootstrap/issues"
 
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-cov",
     "hypothesis",
     "ruff",
     "mypy",
+    "mkdocs-material",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
