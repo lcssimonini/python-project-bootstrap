@@ -1,7 +1,7 @@
 VERSION 0.8
 
-# ---------- base image ----------
-base:
+# ---------- base-image ----------
+base-image:
     FROM python:3.12-slim
     WORKDIR /workspace
 
@@ -22,7 +22,7 @@ base:
 
 # ---------- deps (with project installed) ----------
 deps:
-    FROM +base
+    FROM +base-image
 
     # Copy dependency manifests and README (required by pyproject.toml)
     COPY pyproject.toml uv.lock README.md ./
