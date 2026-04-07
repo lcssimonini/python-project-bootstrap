@@ -6,7 +6,27 @@ import subprocess
 from pathlib import Path
 
 import hypothesis.strategies as st
+import pytest
 from hypothesis import HealthCheck, given, settings
+
+
+def _has_docker() -> bool:
+    """Check if docker and docker compose are available."""
+    if not shutil.which("docker"):
+        return False
+    try:
+        subprocess.run(
+            ["docker", "compose", "version"],
+            capture_output=True,
+            check=True,
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+DOCKER_AVAILABLE = _has_docker()
+requires_docker = pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker not available")
 
 # --- Strategies ---
 
@@ -260,6 +280,7 @@ def test_generated_readme_reflects_active_flags(name, flags, run_bootstrap, tmp_
 # **Validates: Requirements 17.1, 17.2, 18.1, 18.2**
 
 
+@requires_docker
 @given(name=uv_safe_project_names)
 @settings(
     max_examples=1, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
@@ -304,6 +325,7 @@ def test_dockerignore_contains_required_patterns(name, run_bootstrap, tmp_workdi
 # **Validates: Requirements 17.3**
 
 
+@requires_docker
 @given(name=uv_safe_project_names)
 @settings(
     max_examples=1, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
@@ -333,6 +355,7 @@ def test_docker_compose_uses_targeted_mounts(name, run_bootstrap, tmp_workdir):
 # **Validates: Requirements 16.1, 16.2, 16.3**
 
 
+@requires_docker
 @given(name=uv_safe_project_names, version=valid_python_versions)
 @settings(
     max_examples=1, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
@@ -519,6 +542,7 @@ def test_generated_project_passes_uv_sync_and_pytest(name, run_bootstrap, tmp_wo
 # **Validates: Requirements 23.6**
 
 
+@requires_docker
 @given(name=uv_safe_project_names)
 @settings(
     max_examples=1, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]

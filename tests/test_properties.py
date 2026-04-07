@@ -8,7 +8,27 @@ import sys
 from pathlib import Path
 
 import hypothesis.strategies as st
+import pytest
 from hypothesis import HealthCheck, given, settings
+
+
+def _has_docker() -> bool:
+    """Check if docker and docker compose are available."""
+    if not shutil.which("docker"):
+        return False
+    try:
+        subprocess.run(
+            ["docker", "compose", "version"],
+            capture_output=True,
+            check=True,
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+DOCKER_AVAILABLE = _has_docker()
+requires_docker = pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker not available")
 
 # --- Strategies ---
 
@@ -239,6 +259,7 @@ def test_pyproject_contains_all_required_configuration(name, run_bootstrap, tmp_
 # Validates: Requirements 7.1, 7.2, 7.3, 7.4
 
 
+@requires_docker
 @given(name=uv_safe_project_names)
 @settings(
     max_examples=1,
@@ -280,6 +301,7 @@ def test_dockerfile_follows_best_practices(name, run_bootstrap, tmp_workdir):
 # Validates: Requirements 7.5
 
 
+@requires_docker
 @given(name=uv_safe_project_names)
 @settings(
     max_examples=1,
