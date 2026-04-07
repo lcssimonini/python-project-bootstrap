@@ -16,12 +16,27 @@ classifiers = [
 ]
 dependencies = [
     "jinja2",
+    "typer",
+    "rich",
 ]
+
+[project.scripts]
+python-project-bootstrap = "python_project_bootstrap.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/lcssimonini/python-project-bootstrap"
 Repository = "https://github.com/lcssimonini/python-project-bootstrap"
 Issues = "https://github.com/lcssimonini/python-project-bootstrap/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/python_project_bootstrap"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
 
 [dependency-groups]
 dev = [
@@ -31,6 +46,7 @@ dev = [
     "ruff",
     "mypy",
     "mkdocs-material",
+    "pyinstaller",
 ]
 
 [tool.pytest.ini_options]
@@ -42,3 +58,12 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+
+[tool.uv.workspace]
+members = [
+    "test-py-project",
+    "test-standalone",
+    "test-verification",
+    "test-bootstrap-project",
+    "e2e-test-project",
+]

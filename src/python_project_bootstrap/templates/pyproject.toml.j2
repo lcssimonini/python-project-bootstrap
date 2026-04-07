@@ -1,0 +1,57 @@
+[project]
+name = "{{ project_name }}"
+version = "0.1.0"
+description = ""
+requires-python = ">={{ python_version }}"
+dependencies = [
+{%- if include_api %}
+    "fastapi",
+    "uvicorn[standard]",
+{%- endif %}
+{%- if include_cli %}
+    "typer",
+{%- endif %}
+    "pydantic",
+]
+
+[project.scripts]
+{%- if include_cli %}
+"{{ project_name }}" = "{{ package_name }}.cli:app"
+{%- endif %}
+{%- if include_api %}
+"{{ project_name }}-api" = "{{ package_name }}.api.main:app"
+{%- endif %}
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+    "ruff",
+    "mypy",
+    "pre-commit",
+    "pyinstaller",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py{{ python_version | replace('.', '') }}"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]

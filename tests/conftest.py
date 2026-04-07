@@ -2,11 +2,9 @@
 
 import os
 import subprocess
-from pathlib import Path
+import sys
 
 import pytest
-
-SCRIPT_PATH = Path(__file__).parent.parent / "python-project-bootstrap.sh"
 
 
 @pytest.fixture
@@ -20,10 +18,10 @@ def tmp_workdir(tmp_path):
 
 @pytest.fixture
 def run_bootstrap(tmp_workdir):
-    """Return a helper to run the bootstrap script with given args."""
+    """Return a helper to run the bootstrap CLI with given args."""
 
     def _run(*args, env=None):
-        cmd = ["bash", str(SCRIPT_PATH)] + list(args)
+        cmd = [sys.executable, "-m", "python_project_bootstrap.cli"] + list(args)
         run_env = os.environ.copy()
         if env:
             run_env.update(env)

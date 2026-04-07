@@ -1,0 +1,89 @@
+# {{ project_name }}
+
+## Setup
+
+```bash
+make install
+make dev
+```
+
+## Available Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make help` | Show available targets |
+| `make install` | Install dependencies |
+| `make dev` | Install dev dependencies and pre-commit hooks |
+{%- if include_api %}
+| `make run-api` | Run FastAPI app |
+{%- endif %}
+{%- if include_cli %}
+| `make run-cli` | Run CLI tool |
+{%- endif %}
+| `make test` | Run tests |
+| `make lint` | Run linter |
+| `make format` | Format code |
+| `make type-check` | Run type checker |
+{%- if include_docker %}
+| `make docker-build` | Build Docker image |
+| `make docker-up` | Start containers |
+| `make docker-down` | Stop containers |
+{%- endif %}
+| `make pre-commit-install` | Install pre-commit hooks |
+| `make clean` | Remove build artifacts and caches |
+{%- if include_cli %}
+| `make build-exe` | Build standalone executable via PyInstaller |
+{%- endif %}
+{%- if include_api %}
+
+## API
+
+Run the FastAPI development server:
+
+```bash
+make run-api
+```
+
+The API will be available at `http://localhost:8000`.
+{%- endif %}
+{%- if include_cli %}
+
+## CLI
+
+Run the CLI tool:
+
+```bash
+make run-cli
+```
+{%- endif %}
+{%- if include_docker %}
+
+## Docker
+
+Build and run with Docker Compose:
+
+```bash
+make docker-build
+make docker-up
+```
+
+Stop containers:
+
+```bash
+make docker-down
+```
+{%- endif %}
+
+## Testing
+
+```bash
+make test
+```
+
+## Linting & Formatting
+
+```bash
+make lint
+make format
+make type-check
+```
