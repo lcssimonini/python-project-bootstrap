@@ -104,6 +104,9 @@ def test_dryrun_output_uses_prefix(name, run_bootstrap, tmp_workdir):
             continue
         if "/" in clean and not clean.startswith("["):
             continue
+        # Skip lines that are just digits (wrapped project names like a0000...)
+        if clean.isdigit() or clean.isalnum():
+            continue
         action_lines.append(clean)
 
     bad_lines = [line for line in action_lines if "[DRY-RUN]" not in line]
