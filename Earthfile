@@ -1,7 +1,7 @@
 VERSION 0.8
 
-# ---------- shared image for all targets ----------
-deps:
+# ---------- base image ----------
+base:
     FROM python:3.12-slim
     WORKDIR /workspace
 
@@ -20,8 +20,13 @@ deps:
     RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
         mv /root/.local/bin/uv /usr/local/bin/uv
 
-    # Copy dependency manifests first for layer caching
-    COPY pyproject.toml uv.lock ./
+# ---------- deps (with project installed) ----------
+deps:
+    FROM +base
+
+    # Copy dependency manifests and README (required by pyproject.toml)
+    COPY pyproject.toml uv.lock README.md ./
+    COPY src/ src/
     RUN uv sync --frozen --dev
 
     # Copy everything else
@@ -32,7 +37,7 @@ lint:
     FROM +deps
     RUN uv run ruff check .
     RUN uv run ruff format --check .
-    RUN shellcheck python-project-bootstrap.sh dev-lifecycle/ci/run-tests.sh dev-lifecycle/hooks/install-hooks.sh dev-lifecycle/hooks/pre-commit dev-lifecycle/secrets/detect-secrets.sh
+    RUN shellcheck dev-lifecycle/ci/run-tests.sh dev-lifecycle/hooks/install-hooks.sh dev-lifecycle/hooks/pre-commit dev-lifecycle/secrets/detect-secrets.sh
 
 # ---------- secret scan ----------
 secrets:
@@ -52,7 +57,7 @@ test:
         git config --global user.email "ci@test.local" && \
         git config --global init.defaultBranch main
     ENV SKIP_PREREQS=true
-    RUN bash dev-lifecycle/ci/run-tests.sh -k "not test_prerequisite_checker"
+    RUN bash dev-lifecycle/ci/run-tests.sh
 
 # ---------- all checks (convenience) ----------
 ci:
