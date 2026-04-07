@@ -171,6 +171,7 @@ def test_existing_directory_prevents_execution(name, run_bootstrap, tmp_workdir)
 # Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 9.1
 
 
+@requires_docker
 @given(name=uv_safe_project_names)
 @settings(
     max_examples=1,
@@ -326,6 +327,7 @@ def test_docker_compose_omits_version_key(name, run_bootstrap, tmp_workdir):
 # Validates: Requirements 8.1, 8.2, 8.3, 8.4, 9.3, 13.1, 13.4, 13.5
 
 
+@requires_docker
 @given(name=uv_safe_project_names)
 @settings(
     max_examples=1,

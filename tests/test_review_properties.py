@@ -112,6 +112,7 @@ def test_exclusion_flags_remove_corresponding_files(name, flags, run_bootstrap, 
 # **Validates: Requirements 7.5**
 
 
+@requires_docker
 @given(name=uv_safe_project_names)
 @settings(
     max_examples=1, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture]
